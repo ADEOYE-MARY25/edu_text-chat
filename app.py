@@ -1,10 +1,6 @@
-# """
-# Streamlit web UI for the educational RAG chatbot.
-
-# The app reuses the Chroma database created by education_rag_pipeline.py. Both
-# files resolve paths from edu_rag_project/, so they work from any terminal
-# working directory.
-# """
+"""
+Streamlit web UI for the educational RAG chatbot.
+"""
 
 import os
 import time
@@ -31,29 +27,31 @@ st.set_page_config(
     layout="wide",
 )
 
-# Load .env from edu_rag_project first, then fall back to the process environment.
+# Load .env for local development
 load_dotenv(PROJECT_DIR / ".env")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Try Streamlit secrets first, then environment
+try:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+except (FileNotFoundError, KeyError, AttributeError):
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
-    st.error("GROQ_API_KEY not found. Set it in edu_rag_project/.env or as an environment variable.")
+    st.error("GROQ_API_KEY not found. Set it in Streamlit secrets, in .env, or as an environment variable.")
     st.stop()
 
 
 @st.cache_resource
 def load_embeddings():
-    """Load the same embedding model used to build chroma_db."""
     return get_embeddings()
 
 
 @st.cache_resource
 def load_vector_store():
-    """Open the persistent Chroma database; build it if missing."""
     from langchain_community.vectorstores import Chroma
 
     embeddings = load_embeddings()
 
-    # If the store doesn't exist, build it from documents in data/
     if not CHROMA_DIR.exists() or not any(CHROMA_DIR.iterdir()):
         st.info("Building vector database from documents... (this may take a minute)")
         docs = load_documents()
@@ -64,15 +62,10 @@ def load_vector_store():
         if not chunks:
             st.error("No text could be extracted from your documents.")
             st.stop()
-        # Build and persist the store
         vectordb = build_vector_store(chunks, embeddings, persist_dir=CHROMA_DIR, force_rebuild=True)
     else:
-        vectordb = Chroma(
-            persist_directory=str(CHROMA_DIR),
-            embedding_function=embeddings,
-        )
+        vectordb = Chroma(persist_directory=str(CHROMA_DIR), embedding_function=embeddings)
 
-    # Verify the store is not empty
     if vectordb._collection.count() == 0:
         st.error("The vector store is empty. Add documents to data/ and restart the app.")
         st.stop()
@@ -82,7 +75,6 @@ def load_vector_store():
 
 @st.cache_resource
 def get_groq_llm():
-    """Create the Groq chat model used by the Streamlit app."""
     from langchain_groq import ChatGroq
 
     return ChatGroq(
@@ -95,7 +87,6 @@ def get_groq_llm():
 
 
 def answer_with_retry(qa_chain, query, max_retries=3, base_delay=2):
-    """Retry only rate-limit errors; return normal errors directly to the UI."""
     for attempt in range(max_retries):
         try:
             return qa_chain.invoke(query)
@@ -119,7 +110,6 @@ def answer_with_retry(qa_chain, query, max_retries=3, base_delay=2):
 
 @st.cache_resource
 def build_qa_chain():
-    """Build the retrieval and answer chain once per Streamlit session."""
     vectordb = load_vector_store()
     llm = get_groq_llm()
     context_retriever = RunnableLambda(lambda question: retrieve_context(vectordb, question, k=8))
