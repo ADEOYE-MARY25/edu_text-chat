@@ -153,6 +153,12 @@ This file stores private environment variables such as:
 GROQ_API_KEY=your_key_here
 ```
 
+To configure the app locally:
+
+1. Copy `.env.example` to `.env`.
+2. Replace `your_key_here` with your real Groq API key.
+3. Optionally, copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` if you want to use Streamlit secrets.
+
 Why this file is important:
 
 Groq needs an API key before the app can generate answers. Do not share this file
@@ -277,16 +283,17 @@ Run the pipeline first:
 
 ### `GROQ_API_KEY not found`
 
-Create or update:
-
-```text
-edu_rag_project/.env
-```
-
-Add:
+Create or update `.env` from `.env.example` and add:
 
 ```text
 GROQ_API_KEY=your_key_here
+```
+
+Or create `.streamlit/secrets.toml` from
+`.streamlit/secrets.toml.example` and add:
+
+```toml
+GROQ_API_KEY = "your_key_here"
 ```
 
 ### No Useful Answers
